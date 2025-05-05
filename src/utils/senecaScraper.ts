@@ -1,16 +1,4 @@
-/**
- * Utility functions for extracting content from Seneca Learning pages
- */
-
-export interface SenecaQuestion {
-  question: string;
-  answer: string;
-}
-
-export interface SenecaResults {
-  title: string;
-  questions: SenecaQuestion[];
-}
+import { SenecaQuestion, SenecaResults, SenecaConcept, SenecaSection } from './types';
 
 export const extractSenecaContent = async (userUrl: string): Promise<SenecaResults> => {
   try {
@@ -67,171 +55,218 @@ export const extractSenecaContent = async (userUrl: string): Promise<SenecaResul
 // Process the API response data into our SenecaResults format
 const processApiResponse = (data: any): SenecaResults => {
   try {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid API response format');
+    }
+
     // Extract the title from the data
     let title = data.title || "Seneca Homework";
+    let currentQuestions: SenecaQuestion[] = [];
+    const sections: SenecaSection[] = [];
     
-    // Extract questions and answers from different module types
-    const questions: SenecaQuestion[] = [];
-    
-    if (data.contents && Array.isArray(data.contents)) {
-      data.contents.forEach((contentItem: any) => {
-        if (contentItem.contentModules && Array.isArray(contentItem.contentModules)) {
-          contentItem.contentModules.forEach((module: any) => {
-            if (module.moduleType === "multiple-choice") {
-              questions.push({
-                question: module.content.question,
-                answer: module.content.correctAnswer
-              });
-            } else if (module.moduleType === "concept") {
-              if (module.content.examples && Array.isArray(module.content.examples)) {
-                module.content.examples.forEach((example: any) => {
-                  if (example.title && example.example) {
-                    questions.push({
-                      question: example.title,
-                      answer: example.example
+    if (!data.contents || !Array.isArray(data.contents)) {
+      console.warn('No content modules found in the response');
+      return { title, sections: [] };
+    }
+
+    data.contents.forEach((contentItem: any) => {
+      if (!contentItem.contentModules || !Array.isArray(contentItem.contentModules)) {
+        return;
+      }
+
+      let currentToggleGroup: {
+        question: string;
+        answers: SenecaQuestion[];
+      } | null = null;
+
+      contentItem.contentModules.forEach((module: any, moduleIndex: number) => {
+        if (!module || !module.content) return;
+
+        try {
+          // Handle concept modules
+          if (module.moduleType === "concept") {
+            // If we have pending questions or toggle group, add them as a section
+            if (currentToggleGroup) {
+              currentQuestions.push(...currentToggleGroup.answers);
+              currentToggleGroup = null;
+            }
+            if (currentQuestions.length > 0) {
+              sections.push([...currentQuestions]);
+              currentQuestions = [];
+            }
+            
+            // Add the concept as its own section
+            sections.push({
+              type: 'concept',
+              title: module.content.title || "Concept",
+              content: module.content.text || module.content.html || ""
+            });
+            return;
+          }
+
+          switch (module.moduleType) {
+            case "multiple-choice":
+              if (module.content.question && module.content.correctAnswer) {
+                if (currentToggleGroup) {
+                  currentQuestions.push(...currentToggleGroup.answers);
+                  currentToggleGroup = null;
+                }
+                currentQuestions.push({
+                  type: 'multiple-choice',
+                  question: module.content.question.trim(),
+                  answer: module.content.correctAnswer.trim()
+                });
+              }
+              break;
+
+            case "toggles":
+              if (module.content.statement && Array.isArray(module.content.toggles)) {
+                // Start a new toggle group if we don't have one
+                if (!currentToggleGroup) {
+                  currentToggleGroup = {
+                    question: module.content.statement.trim(),
+                    answers: []
+                  };
+                }
+
+                module.content.toggles.forEach((toggle: any) => {
+                  if (toggle.correctToggle) {
+                    currentToggleGroup!.answers.push({
+                      type: 'toggle',
+                      question: currentToggleGroup!.question,
+                      answer: toggle.correctToggle.trim(),
+                      toggleGroup: `toggle-group-${moduleIndex}`
                     });
                   }
                 });
               }
-            } else if (module.moduleType === "grid") {
-              if (module.content.title && module.content.definitions) {
-                module.content.definitions.forEach((def: any) => {
-                  const wordContent = typeof def.word === 'string' 
-                    ? def.word 
-                    : Array.isArray(def.word) 
-                      ? def.word.map((w: any) => typeof w === 'string' ? w : w.word).join('') 
-                      : '';
-                  
-                  questions.push({
-                    question: wordContent,
-                    answer: def.text
-                  });
+              break;
+
+            case "list":
+              if (module.content.title && Array.isArray(module.content.items)) {
+                if (currentToggleGroup) {
+                  currentQuestions.push(...currentToggleGroup.answers);
+                  currentToggleGroup = null;
+                }
+                module.content.items.forEach((item: any) => {
+                  if (item) {
+                    currentQuestions.push({
+                      type: 'list',
+                      question: module.content.title.trim(),
+                      answer: (typeof item === 'string' ? item : JSON.stringify(item)).trim()
+                    });
+                  }
                 });
               }
-            } else if (module.moduleType === "wordfill") {
-              // Extract the full sentence
-              const wordFillContent = module.content.words
-                .map((word: any) => typeof word === 'string' ? word : word.word)
-                .join('');
-              
-              questions.push({
-                question: "Fill in the blank",
-                answer: wordFillContent
-              });
-            } else if (module.moduleType === "wrong-word") {
-              // Extract the sentence and correct word
-              const sentence = module.content.sentence
-                .map((part: any) => typeof part === 'string' ? part : part.word)
-                .join('');
-              
-              questions.push({
-                question: module.content.selectInstruction || "Identify the wrong word",
-                answer: sentence
-              });
-            } else if (module.moduleType === "image-description") {
-              // Extract image description
-              const description = module.content.words
-                .map((word: any) => typeof word === 'string' ? word : word.word)
-                .join('');
-              
-              questions.push({
-                question: "Image Description",
-                answer: description
-              });
-            }
-          });
+              break;
+
+            case "grid":
+              if (Array.isArray(module.content.definitions)) {
+                if (currentToggleGroup) {
+                  currentQuestions.push(...currentToggleGroup.answers);
+                  currentToggleGroup = null;
+                }
+                module.content.definitions.forEach((def: any) => {
+                  if (!def) return;
+                  
+                  const wordContent = typeof def.word === 'string'
+                    ? def.word
+                    : Array.isArray(def.word)
+                      ? def.word.map((w: any) => typeof w === 'string' ? w : w.word).join('')
+                      : typeof def.word === 'object' && def.word?.word
+                        ? def.word.word
+                        : '';
+
+                  if (wordContent && def.text) {
+                    currentQuestions.push({
+                      type: 'grid',
+                      question: wordContent.trim(),
+                      answer: def.text.trim()
+                    });
+                  }
+                });
+              }
+              break;
+
+            case "wordfill":
+              if (module.content.words) {
+                if (currentToggleGroup) {
+                  currentQuestions.push(...currentToggleGroup.answers);
+                  currentToggleGroup = null;
+                }
+
+                // Reconstruct the full sentence and answer
+                const fullSentence = module.content.words.map(word => {
+                  if (typeof word === 'string') return word;
+                  return word.otherPermittedWords?.[0] || word.word || '';
+                }).join('');
+
+                const answers = module.content.words
+                  .filter((word): word is { word: string; otherPermittedWords?: string[] } => 
+                    typeof word !== 'string' && !!word.word
+                  )
+                  .map(word => word.word)
+                  .join(', ');
+
+                if (answers) {
+                  currentQuestions.push({
+                    type: 'wordfill',
+                    question: fullSentence,
+                    answer: answers
+                  });
+                }
+              }
+              break;
+
+            case "image-description":
+              if (module.content.words) {
+                if (currentToggleGroup) {
+                  currentQuestions.push(...currentToggleGroup.answers);
+                  currentToggleGroup = null;
+                }
+
+                // Reconstruct the full sentence and answer
+                const fullSentence = module.content.words.map(word => {
+                  if (typeof word === 'string') return word;
+                  return '____';
+                }).join('');
+
+                const answers = module.content.words
+                  .filter((word): word is { word: string; otherPermittedWords?: string[] } => 
+                    typeof word !== 'string' && !!word.word
+                  )
+                  .map(word => word.word)
+                  .join(', ');
+
+                if (answers) {
+                  currentQuestions.push({
+                    type: 'image-description',
+                    question: fullSentence,
+                    answer: answers
+                  });
+                }
+              }
+              break;
+          }
+        } catch (moduleError) {
+          console.warn('Error processing module:', moduleError);
         }
       });
+
+      // Add any remaining toggle group
+      if (currentToggleGroup) {
+        currentQuestions.push(...currentToggleGroup.answers);
+      }
+    });
+
+    // Add the final section if it has questions
+    if (currentQuestions.length > 0) {
+      sections.push([...currentQuestions]);
     }
 
-    // If title is not found in the root of the data, try to extract it from the first content module
-    if (title === "Seneca Homework" && data.contents && data.contents.length > 0) {
-      const firstContent = data.contents[0];
-      if (firstContent.contentModules && firstContent.contentModules.length > 0) {
-        const firstModule = firstContent.contentModules[0];
-        if (firstModule.content && firstModule.content.title) {
-          title = firstModule.content.title;
-        }
-      }
-    }
-    
-    return {
-      title,
-      questions
-    };
+    return { title, sections };
   } catch (error) {
     console.error("Error processing API response:", error);
-    return {
-      title: "Seneca Homework",
-      questions: [
-        {
-          question: "Error processing data",
-          answer: "Could not extract questions and answers from the API response. Please check console for details."
-        }
-      ]
-    };
+    throw new Error('Failed to process the homework content');
   }
-};
-
-// Kept for backwards compatibility or testing purposes
-const fetchSenecaContent = async (url: string): Promise<string> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // Return fake HTML content for demo purposes
-  return `
-    <html>
-      <head><title>Biology Unit 2: Cells - Seneca Learning</title></head>
-      <body>
-        <div class="homework-title">Biology Unit 2: Cells</div>
-        <div class="question-container">
-          <div class="question">What is the basic unit of all living organisms?</div>
-          <div class="answer">Cell</div>
-        </div>
-        <div class="question-container">
-          <div class="question">What are the two main types of cells?</div>
-          <div class="answer">Prokaryotic and Eukaryotic</div>
-        </div>
-        <div class="question-container">
-          <div class="question">Which organelle is responsible for energy production in the cell?</div>
-          <div class="answer">Mitochondria</div>
-        </div>
-        <div class="question-container">
-          <div class="question">What is the function of the cell membrane?</div>
-          <div class="answer">To control what enters and leaves the cell</div>
-        </div>
-      </body>
-    </html>
-  `;
-};
-
-// Kept for backwards compatibility or testing purposes
-const parseSenecaHTML = (html: string): SenecaResults => {
-  console.log("Parsing Seneca HTML content...");
-  
-  // In a real implementation, we would use a proper HTML parser
-  // For now, we'll create a mock result based on our simulated HTML
-  
-  // Extract title (simplified)
-  const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1] : "Seneca Homework";
-  
-  // Extract questions and answers (simplified)
-  const questionsData: SenecaQuestion[] = [];
-  
-  // Very simplified extraction logic - in a real implementation we'd use DOM parsing
-  const questionRegex = /<div class="question">(.*?)<\/div>\s*<div class="answer">(.*?)<\/div>/gs;
-  let match;
-  
-  while ((match = questionRegex.exec(html)) !== null) {
-    questionsData.push({
-      question: match[1].trim(),
-      answer: match[2].trim()
-    });
-  }
-  
-  return {
-    title,
-    questions: questionsData
-  };
-};
+}; 

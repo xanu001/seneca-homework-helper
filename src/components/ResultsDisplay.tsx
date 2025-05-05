@@ -1,165 +1,154 @@
-
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-import { SenecaResults, SenecaQuestion } from "@/utils/senecaScraper";
-import { BookOpen, Info, ChevronDown, ChevronUp } from "lucide-react";
-import { toast } from "sonner";
+import { SenecaResults, SenecaQuestion, SenecaConcept, SenecaSection } from "@/utils/types";
 
 interface ResultsDisplayProps {
   results: SenecaResults | null;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
-  const [wordBankOpen, setWordBankOpen] = useState(false);
-  const [selectedWord, setSelectedWord] = useState<string | null>(null);
-
   if (!results) return null;
 
-  // Helper function to get wordbank items
-  const getWordBankItems = () => {
-    if (!results.questions) return [];
-    
-    // Extract unique terms from the questions
-    const terms = new Set<string>();
-    results.questions.forEach(item => {
-      // Add the question itself as it might contain important terms
-      if (item.question) terms.add(item.question);
-      
-      // Extract key terms from the answer
-      if (item.answer) {
-        // Simple heuristic: look for capitalized words that might be terms
-        const matches = item.answer.match(/\b[A-Z][a-z]+(\s[A-Z][a-z]+)*\b/g);
-        if (matches) {
-          matches.forEach(match => terms.add(match));
-        }
-      }
-    });
-    
-    return Array.from(terms).slice(0, 10); // Limit to 10 terms
-  };
+  const renderToggleGroup = (questions: SenecaQuestion[]) => {
+    if (questions.length === 0) return null;
+    const groupQuestion = questions[0].question;
 
-  // Request explanation for a term
-  const requestExplanation = (term: string) => {
-    // In a real implementation, this would call an AI API
-    // For now, we'll just show a toast message
-    toast.info(`Getting explanation for "${term}"...`, {
-      description: "This feature requires authentication. Please sign in to use AI explanations."
-    });
-    setSelectedWord(term);
-  };
-
-  const wordBankItems = getWordBankItems();
-
-  return (
-    <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto mt-6">
-      {/* Word Bank Section */}
-      <Collapsible 
-        open={wordBankOpen} 
-        onOpenChange={setWordBankOpen}
-        className="w-full rounded-lg border shadow-sm"
-      >
-        <div className="flex items-center justify-between p-4 bg-primary/10">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <h3 className="font-medium">Word Bank</h3>
+    return (
+      <div className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-all">
+        <div className="flex flex-col space-y-4">
+          <h3 className="text-lg font-medium text-gray-800">{groupQuestion}</h3>
+          <div className="ml-6 space-y-3">
+            {questions.map((item, idx) => (
+              <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <div className="text-base text-gray-700">{item.answer}</div>
+              </div>
+            ))}
           </div>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm">
-              {wordBankOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              <span className="sr-only">Toggle Word Bank</span>
-            </Button>
-          </CollapsibleTrigger>
         </div>
-        
-        <CollapsibleContent className="p-4">
-          {wordBankItems.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {wordBankItems.map((term, i) => (
-                <HoverCard key={i}>
-                  <HoverCardTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-xs"
-                      onClick={() => requestExplanation(term)}
-                    >
-                      {term}
-                    </Button>
-                  </HoverCardTrigger>
-                  <HoverCardContent className="w-80">
-                    <div className="flex justify-between space-x-4">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-semibold">{term}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Sign in to see AI-powered explanations of this term.
-                        </p>
-                      </div>
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
+      </div>
+    );
+  };
+
+  const renderConcept = (concept: SenecaConcept) => (
+    <div className="my-8 p-6 bg-primary/5 border-l-4 border-primary rounded-r-lg">
+      <h2 className="text-xl font-semibold text-primary mb-3">{concept.title}</h2>
+      <div className="prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: concept.content }} />
+    </div>
+  );
+
+  const renderQuestion = (item: SenecaQuestion, index: number) => {
+    const renderQuestionContent = () => {
+      switch (item.type) {
+        case 'wordfill':
+        case 'image-description':
+          return (
+            <div className="text-lg font-medium text-gray-800">
+              {item.question.split('____').map((part, i, arr) => (
+                <React.Fragment key={i}>
+                  {part}
+                  {i < arr.length - 1 && (
+                    <span className="px-2 py-1 mx-1 bg-primary/10 rounded text-primary">
+                      ______
+                    </span>
+                  )}
+                </React.Fragment>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No key terms identified for this homework.</p>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
+          );
+        default:
+          return (
+            <div className="text-lg font-medium text-gray-800">
+              {item.question}
+            </div>
+          );
+      }
+    };
 
-      {/* Results Card */}
+    return (
+      <div className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-all">
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-start gap-4">
+            <span className="bg-primary text-white text-sm font-medium px-3 py-1 rounded-full mt-1">
+              Q{index + 1}
+            </span>
+            <div className="flex-1">
+              {renderQuestionContent()}
+            </div>
+          </div>
+
+          <div className="ml-12 mt-2">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+              <div className="text-sm font-medium text-primary mb-2">Answer{item.type === 'wordfill' || item.type === 'image-description' ? 's' : ''}:</div>
+              <div className="text-base text-gray-700 whitespace-pre-line">
+                {item.type === 'wordfill' || item.type === 'image-description' 
+                  ? item.answer.split(', ').map((ans, i) => (
+                      <div key={i} className="mb-1">• {ans}</div>
+                    ))
+                  : item.answer}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSection = (section: SenecaSection, sectionIndex: number) => {
+    if ('type' in section && section.type === 'concept') {
+      return renderConcept(section);
+    }
+
+    const questions = section as SenecaQuestion[];
+
+    // Group toggle questions
+    const toggleGroups: { [key: string]: SenecaQuestion[] } = {};
+    const regularQuestions: SenecaQuestion[] = [];
+
+    questions.forEach(question => {
+      if (question.type === 'toggle' && question.toggleGroup) {
+        if (!toggleGroups[question.toggleGroup]) {
+          toggleGroups[question.toggleGroup] = [];
+        }
+        toggleGroups[question.toggleGroup].push(question);
+      } else {
+        regularQuestions.push(question);
+      }
+    });
+
+    return (
+      <div key={sectionIndex} className="space-y-8">
+        {Object.values(toggleGroups).map((group, idx) => (
+          <React.Fragment key={`toggle-group-${idx}`}>
+            {renderToggleGroup(group)}
+          </React.Fragment>
+        ))}
+        {regularQuestions.map((question, idx) => (
+          <React.Fragment key={`question-${idx}`}>
+            {renderQuestion(question, idx)}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto mt-6">
+      <div className="text-center mb-4">
+        <h1 className="text-3xl font-bold text-gray-800">{results.title}</h1>
+        <p className="text-gray-600 mt-2">Review your answers below</p>
+      </div>
+
       <Card className="w-full">
-        <CardHeader className="bg-primary/10">
-          <CardTitle className="text-2xl">{results.title || "Homework Results"}</CardTitle>
+        <CardHeader className="bg-primary/5 border-b">
+          <CardTitle className="text-xl">Questions & Answers</CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
-          {results.questions && results.questions.length > 0 ? (
+        <CardContent className="p-6">
+          {results.sections.length > 0 ? (
             <div className="space-y-6">
-              {results.questions.map((item: SenecaQuestion, index: number) => (
-                <div key={index} className="border rounded-lg p-4 bg-secondary/30 hover:bg-secondary/50 transition-colors">
-                  <div className="flex flex-col space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-primary text-white text-xs font-medium px-2.5 py-1 rounded-full">Q{index + 1}</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div 
-                              className="text-sm font-medium hover:text-primary cursor-pointer flex items-center gap-1"
-                              onClick={() => requestExplanation(item.question)}
-                            >
-                              {item.question}
-                              <Info className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Sign in to see AI explanations</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-dashed">
-                      <div className="text-xs font-medium text-primary mb-1">Answer:</div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div 
-                              className="text-base whitespace-pre-line hover:text-primary cursor-pointer"
-                              onClick={() => requestExplanation(item.answer)}
-                            >
-                              {item.answer}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Sign in for detailed explanations</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
-                </div>
+              {results.sections.map((section, idx) => (
+                <React.Fragment key={idx}>
+                  {renderSection(section, idx)}
+                </React.Fragment>
               ))}
             </div>
           ) : (

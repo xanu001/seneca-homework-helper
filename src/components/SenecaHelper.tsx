@@ -51,11 +51,11 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived, onLoadin
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Seneca Homework Helper</CardTitle>
-        <CardDescription>
-          Enter your Seneca homework URL to get answers instantly
+    <Card className="w-full max-w-2xl mx-auto shadow-lg border border-gray-100">
+      <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-lg">
+        <CardTitle className="text-2xl font-bold text-gray-800">Seneca Homework Helper</CardTitle>
+        <CardDescription className="text-gray-600 mt-1">
+          Enter your Seneca Learning homework URL to get instant answers
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -69,12 +69,12 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived, onLoadin
               className="flex-1"
               disabled={loading}
             />
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 ease-in-out transform hover:scale-105">
               {loading ? "Loading..." : "Get Answers"}
             </Button>
           </div>
           <div className="text-sm text-muted-foreground">
-            Paste your full Seneca URL to see all available answers for your homework.
+            Enter your full Seneca Learning homework URL to get instant answers.
             <br />
             Example format: https://app.senecalearning.com/classroom/course/419cd464-5c51-4d08-b49c-d5325d6121c8/section/9b5fa6b6-c98b-44e4-a889-cf3c36ba8f10/session
           </div>

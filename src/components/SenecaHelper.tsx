@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { extractSenecaContent, SenecaResults } from "@/utils/senecaScraper";
 
 interface SenecaHelperProps {
   onResultsReceived: (results: any) => void;
@@ -29,30 +30,13 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
     setLoading(true);
     
     try {
-      // This is a placeholder for the actual implementation
-      // In a real implementation, we would make an API call to fetch the homework data
-      setTimeout(() => {
-        const mockResults = {
-          title: "Seneca Homework",
-          questions: [
-            {
-              question: "What is the capital of France?",
-              answer: "Paris"
-            },
-            {
-              question: "What is the chemical symbol for water?",
-              answer: "H₂O"
-            }
-          ]
-        };
-        
-        onResultsReceived(mockResults);
-        toast.success("Homework loaded successfully!");
-        setLoading(false);
-      }, 1500);
+      const results = await extractSenecaContent(url);
+      onResultsReceived(results);
+      toast.success("Homework loaded successfully!");
     } catch (error) {
       console.error("Error fetching homework:", error);
       toast.error("Failed to load homework. Please try again.");
+    } finally {
       setLoading(false);
     }
   };

@@ -2,9 +2,10 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { SenecaResults, SenecaQuestion } from "@/utils/senecaScraper";
 
 interface ResultsDisplayProps {
-  results: any | null;
+  results: SenecaResults | null;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
@@ -17,7 +18,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {results.questions && results.questions.map((item: any, index: number) => (
+          {results.questions && results.questions.map((item: SenecaQuestion, index: number) => (
             <div key={index} className="border rounded-lg p-4 bg-secondary/50">
               <div className="flex flex-col space-y-2">
                 <div className="text-sm font-medium">Question {index + 1}:</div>

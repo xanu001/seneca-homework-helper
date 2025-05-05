@@ -12,28 +12,30 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
   if (!results) return null;
 
   return (
-    <Card className="w-full max-w-2xl mx-auto mt-6">
-      <CardHeader>
-        <CardTitle className="text-xl">{results.title || "Homework Results"}</CardTitle>
+    <Card className="w-full max-w-3xl mx-auto mt-6">
+      <CardHeader className="bg-primary/10">
+        <CardTitle className="text-2xl">{results.title || "Homework Results"}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         {results.questions && results.questions.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {results.questions.map((item: SenecaQuestion, index: number) => (
-              <div key={index} className="border rounded-lg p-4 bg-secondary/50">
-                <div className="flex flex-col space-y-2">
-                  <div className="text-sm font-medium">Question {index + 1}:</div>
-                  <div className="text-base">{item.question}</div>
-                  <div className="mt-2 pt-2 border-t">
-                    <div className="text-sm font-medium text-primary">Answer:</div>
-                    <div className="text-base font-medium">{item.answer}</div>
+              <div key={index} className="border rounded-lg p-4 bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                <div className="flex flex-col space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-primary text-white text-xs font-medium px-2.5 py-1 rounded-full">Q{index + 1}</span>
+                    <div className="text-sm font-medium">{item.question}</div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-dashed">
+                    <div className="text-xs font-medium text-primary mb-1">Answer:</div>
+                    <div className="text-base whitespace-pre-line">{item.answer}</div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-4 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground">
             No questions found in the provided homework URL. Please try a different URL.
           </div>
         )}

@@ -7,13 +7,19 @@ import { SenecaResults } from "@/utils/senecaScraper";
 
 const Reader = () => {
   const [results, setResults] = useState<SenecaResults | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleResults = (data: SenecaResults) => {
     setResults(data);
+    setLoading(false);
+  };
+
+  const handleLoading = (isLoading: boolean) => {
+    setLoading(isLoading);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-secondary/30">
+    <div className="min-h-screen flex flex-col bg-secondary/20">
       <Header />
       <main className="flex-1 container py-8 px-4 flex flex-col">
         <div className="text-center mb-8">
@@ -25,8 +31,15 @@ const Reader = () => {
           </p>
         </div>
 
-        <SenecaHelper onResultsReceived={handleResults} />
-        <ResultsDisplay results={results} />
+        <SenecaHelper onResultsReceived={handleResults} onLoadingChange={handleLoading} />
+        
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <ResultsDisplay results={results} />
+        )}
       </main>
       
       <footer className="border-t py-6 md:py-0">

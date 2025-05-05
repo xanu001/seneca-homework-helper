@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for extracting content from Seneca Learning pages
  */
@@ -68,56 +67,92 @@ export const extractSenecaContent = async (userUrl: string): Promise<SenecaResul
 // Process the API response data into our SenecaResults format
 const processApiResponse = (data: any): SenecaResults => {
   try {
-    // Default title
-    let title = "Seneca Homework";
+    // Extract the title from the data
+    let title = data.title || "Seneca Homework";
     
-    // Try to extract a meaningful title
-    if (data.meta && data.meta.title) {
-      title = data.meta.title;
-    } else if (data.course && data.course.title) {
-      title = data.course.title;
-    }
-    
-    // Extract questions and answers
+    // Extract questions and answers from different module types
     const questions: SenecaQuestion[] = [];
     
-    // Handle different possible data structures
-    if (data.items && Array.isArray(data.items)) {
-      data.items.forEach((item: any, index: number) => {
-        if (item.question && item.correctAnswer) {
-          questions.push({
-            question: item.question,
-            answer: item.correctAnswer
-          });
-        }
-      });
-    } else if (data.sections && Array.isArray(data.sections)) {
-      data.sections.forEach((section: any) => {
-        if (section.content && Array.isArray(section.content)) {
-          section.content.forEach((content: any) => {
-            if (content.question && content.answer) {
+    if (data.contents && Array.isArray(data.contents)) {
+      data.contents.forEach((contentItem: any) => {
+        if (contentItem.contentModules && Array.isArray(contentItem.contentModules)) {
+          contentItem.contentModules.forEach((module: any) => {
+            if (module.moduleType === "multiple-choice") {
               questions.push({
-                question: content.question,
-                answer: content.answer
+                question: module.content.question,
+                answer: module.content.correctAnswer
+              });
+            } else if (module.moduleType === "concept") {
+              if (module.content.examples && Array.isArray(module.content.examples)) {
+                module.content.examples.forEach((example: any) => {
+                  if (example.title && example.example) {
+                    questions.push({
+                      question: example.title,
+                      answer: example.example
+                    });
+                  }
+                });
+              }
+            } else if (module.moduleType === "grid") {
+              if (module.content.title && module.content.definitions) {
+                module.content.definitions.forEach((def: any) => {
+                  const wordContent = typeof def.word === 'string' 
+                    ? def.word 
+                    : Array.isArray(def.word) 
+                      ? def.word.map((w: any) => typeof w === 'string' ? w : w.word).join('') 
+                      : '';
+                  
+                  questions.push({
+                    question: wordContent,
+                    answer: def.text
+                  });
+                });
+              }
+            } else if (module.moduleType === "wordfill") {
+              // Extract the full sentence
+              const wordFillContent = module.content.words
+                .map((word: any) => typeof word === 'string' ? word : word.word)
+                .join('');
+              
+              questions.push({
+                question: "Fill in the blank",
+                answer: wordFillContent
+              });
+            } else if (module.moduleType === "wrong-word") {
+              // Extract the sentence and correct word
+              const sentence = module.content.sentence
+                .map((part: any) => typeof part === 'string' ? part : part.word)
+                .join('');
+              
+              questions.push({
+                question: module.content.selectInstruction || "Identify the wrong word",
+                answer: sentence
+              });
+            } else if (module.moduleType === "image-description") {
+              // Extract image description
+              const description = module.content.words
+                .map((word: any) => typeof word === 'string' ? word : word.word)
+                .join('');
+              
+              questions.push({
+                question: "Image Description",
+                answer: description
               });
             }
           });
         }
       });
     }
-    
-    // If no questions were found, try a different approach
-    if (questions.length === 0 && data.content) {
-      // Loop through all keys in data.content that might contain question data
-      Object.keys(data.content).forEach(key => {
-        const item = data.content[key];
-        if (item.question && (item.answer || item.correctAnswer)) {
-          questions.push({
-            question: item.question,
-            answer: item.answer || item.correctAnswer
-          });
+
+    // If title is not found in the root of the data, try to extract it from the first content module
+    if (title === "Seneca Homework" && data.contents && data.contents.length > 0) {
+      const firstContent = data.contents[0];
+      if (firstContent.contentModules && firstContent.contentModules.length > 0) {
+        const firstModule = firstContent.contentModules[0];
+        if (firstModule.content && firstModule.content.title) {
+          title = firstModule.content.title;
         }
-      });
+      }
     }
     
     return {
@@ -131,7 +166,7 @@ const processApiResponse = (data: any): SenecaResults => {
       questions: [
         {
           question: "Error processing data",
-          answer: "Could not extract questions and answers from the API response."
+          answer: "Could not extract questions and answers from the API response. Please check console for details."
         }
       ]
     };

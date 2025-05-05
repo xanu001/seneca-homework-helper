@@ -8,9 +8,10 @@ import { extractSenecaContent, SenecaResults } from "@/utils/senecaScraper";
 
 interface SenecaHelperProps {
   onResultsReceived: (results: SenecaResults) => void;
+  onLoadingChange?: (isLoading: boolean) => void;
 }
 
-const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
+const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived, onLoadingChange }) => {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,6 +35,7 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
     }
     
     setLoading(true);
+    if (onLoadingChange) onLoadingChange(true);
     
     try {
       const results = await extractSenecaContent(url);
@@ -42,6 +44,7 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
     } catch (error) {
       console.error("Error fetching homework:", error);
       toast.error(error instanceof Error ? error.message : "Failed to load homework. Please try again.");
+      if (onLoadingChange) onLoadingChange(false);
     } finally {
       setLoading(false);
     }

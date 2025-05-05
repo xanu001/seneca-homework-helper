@@ -5,7 +5,7 @@ import SenecaHelper from "@/components/SenecaHelper";
 import ResultsDisplay from "@/components/ResultsDisplay";
 import { SenecaResults } from "@/utils/senecaScraper";
 
-const Sparx = () => {
+const Reader = () => {
   const [results, setResults] = useState<SenecaResults | null>(null);
 
   const handleResults = (data: SenecaResults) => {
@@ -18,10 +18,10 @@ const Sparx = () => {
       <main className="flex-1 container py-8 px-4 flex flex-col">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight mb-2">
-            <span className="text-primary logo-text">SPARX</span> Homework Helper
+            <span className="text-primary logo-text">SPARX</span> Reader
           </h1>
           <p className="text-muted-foreground max-w-lg mx-auto">
-            Enter your Seneca URL below to get the answers for your homework.
+            Enter your Seneca URL below to get instant answers to your homework.
           </p>
         </div>
 
@@ -40,4 +40,4 @@ const Sparx = () => {
   );
 };
 
-export default Sparx;
+export default Reader;

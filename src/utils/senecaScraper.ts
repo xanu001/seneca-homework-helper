@@ -13,27 +13,132 @@ export interface SenecaResults {
   questions: SenecaQuestion[];
 }
 
-export const extractSenecaContent = async (url: string): Promise<SenecaResults> => {
+export const extractSenecaContent = async (userUrl: string): Promise<SenecaResults> => {
   try {
-    // In a real-world scenario, this would be an API call to a backend service
-    // that would fetch the HTML content and parse it server-side
+    console.log(`Attempting to extract content from: ${userUrl}`);
     
-    // For now, we'll create a simulated response
-    console.log(`Attempting to extract content from: ${url}`);
+    // Extract the course ID and section ID from the Seneca URL
+    const courseIdMatch = userUrl.match(/course\/([^\/]+)/);
+    const sectionIdMatch = userUrl.match(/section\/([^\/]+)/);
     
-    // Simulate a network request
-    const response = await fetchSenecaContent(url);
+    if (!courseIdMatch || !sectionIdMatch) {
+      throw new Error("Invalid Seneca URL format. Could not extract course ID or section ID.");
+    }
     
-    // Parse the HTML content
-    return parseSenecaHTML(response);
+    const courseId = courseIdMatch[1];
+    const sectionId = sectionIdMatch[1];
+    
+    console.log(`Extracted courseId: ${courseId}, sectionId: ${sectionId}`);
+    
+    // Construct the API URL to fetch the signed URL
+    const apiUrl = `https://seneca.ellsies.tech/api/courses/${courseId}/signed-url?sectionId=${sectionId}`;
+    
+    // Fetch the signed URL from the API
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("API Response:", data);
+    
+    if (!data.url) {
+      throw new Error("API did not return a valid signed URL");
+    }
+    
+    // Fetch the actual content from the signed URL
+    const contentResponse = await fetch(data.url);
+    
+    if (!contentResponse.ok) {
+      throw new Error(`Content fetch failed with status: ${contentResponse.status}`);
+    }
+    
+    const contentData = await contentResponse.json();
+    console.log("Content data:", contentData);
+    
+    // Process the response data into our SenecaResults format
+    return processApiResponse(contentData);
   } catch (error) {
     console.error("Error extracting Seneca content:", error);
-    throw new Error("Failed to extract content from the provided URL");
+    throw new Error(error instanceof Error ? error.message : "Failed to extract content from the provided URL");
   }
 };
 
-// This function would normally make an actual HTTP request to the Seneca URL
-// But since we can't do that directly from the browser due to CORS, this would be handled by a backend
+// Process the API response data into our SenecaResults format
+const processApiResponse = (data: any): SenecaResults => {
+  try {
+    // Default title
+    let title = "Seneca Homework";
+    
+    // Try to extract a meaningful title
+    if (data.meta && data.meta.title) {
+      title = data.meta.title;
+    } else if (data.course && data.course.title) {
+      title = data.course.title;
+    }
+    
+    // Extract questions and answers
+    const questions: SenecaQuestion[] = [];
+    
+    // Handle different possible data structures
+    if (data.items && Array.isArray(data.items)) {
+      data.items.forEach((item: any, index: number) => {
+        if (item.question && item.correctAnswer) {
+          questions.push({
+            question: item.question,
+            answer: item.correctAnswer
+          });
+        }
+      });
+    } else if (data.sections && Array.isArray(data.sections)) {
+      data.sections.forEach((section: any) => {
+        if (section.content && Array.isArray(section.content)) {
+          section.content.forEach((content: any) => {
+            if (content.question && content.answer) {
+              questions.push({
+                question: content.question,
+                answer: content.answer
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    // If no questions were found, try a different approach
+    if (questions.length === 0 && data.content) {
+      // Loop through all keys in data.content that might contain question data
+      Object.keys(data.content).forEach(key => {
+        const item = data.content[key];
+        if (item.question && (item.answer || item.correctAnswer)) {
+          questions.push({
+            question: item.question,
+            answer: item.answer || item.correctAnswer
+          });
+        }
+      });
+    }
+    
+    return {
+      title,
+      questions
+    };
+  } catch (error) {
+    console.error("Error processing API response:", error);
+    return {
+      title: "Seneca Homework",
+      questions: [
+        {
+          question: "Error processing data",
+          answer: "Could not extract questions and answers from the API response."
+        }
+      ]
+    };
+  }
+};
+
+// Kept for backwards compatibility or testing purposes
 const fetchSenecaContent = async (url: string): Promise<string> => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -65,7 +170,7 @@ const fetchSenecaContent = async (url: string): Promise<string> => {
   `;
 };
 
-// Parse the HTML content to extract questions and answers
+// Kept for backwards compatibility or testing purposes
 const parseSenecaHTML = (html: string): SenecaResults => {
   console.log("Parsing Seneca HTML content...");
   

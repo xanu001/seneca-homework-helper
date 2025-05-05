@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Sparx from "./pages/Sparx";
+import Reader from "./pages/Reader";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +20,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/sparx" element={<Sparx />} />
-          <Route path="/reader" element={<NotFound />} />
+          <Route path="/reader" element={<Reader />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

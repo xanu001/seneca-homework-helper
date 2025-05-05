@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { extractSenecaContent, SenecaResults } from "@/utils/senecaScraper";
 
 interface SenecaHelperProps {
-  onResultsReceived: (results: any) => void;
+  onResultsReceived: (results: SenecaResults) => void;
 }
 
 const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
@@ -18,12 +18,18 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
     e.preventDefault();
     
     if (!url.trim()) {
-      toast.error("Please enter a valid Seneca URL");
+      toast.error("Please enter a URL");
       return;
     }
     
     if (!url.includes("senecalearning.com")) {
       toast.error("Please enter a valid Seneca Learning URL");
+      return;
+    }
+    
+    // Check if the URL contains both course and section IDs
+    if (!url.includes("course/") || !url.includes("section/")) {
+      toast.error("Invalid URL format. Please make sure it includes course and section IDs");
       return;
     }
     
@@ -35,7 +41,7 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
       toast.success("Homework loaded successfully!");
     } catch (error) {
       console.error("Error fetching homework:", error);
-      toast.error("Failed to load homework. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Failed to load homework. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -54,7 +60,7 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
           <div className="flex flex-col sm:flex-row gap-3">
             <Input
               type="url"
-              placeholder="https://app.senecalearning.com/classroom/course/..."
+              placeholder="https://app.senecalearning.com/classroom/course/[courseId]/section/[sectionId]/..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               className="flex-1"
@@ -65,7 +71,9 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived }) => {
             </Button>
           </div>
           <div className="text-sm text-muted-foreground">
-            Paste your full Seneca URL to see all available answers for your homework
+            Paste your full Seneca URL to see all available answers for your homework.
+            <br />
+            Example format: https://app.senecalearning.com/classroom/course/419cd464-5c51-4d08-b49c-d5325d6121c8/section/9b5fa6b6-c98b-44e4-a889-cf3c36ba8f10/session
           </div>
         </form>
       </CardContent>

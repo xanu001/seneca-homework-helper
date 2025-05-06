@@ -1,12 +1,17 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, MoreHorizontal, BookOpen, Wand2, Home, Book, Calculator } from "lucide-react";
+import { Check, MoreHorizontal, BookOpen, Wand2, Home, Book, Calculator, ClipboardPaste, Star, User, AlertTriangle } from "lucide-react";
 import { askGemini } from "@/utils/gemini";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import LoginModal from "@/components/LoginModal";
+import UserSettingsDialog from "@/components/UserSettingsDialog";
+import { recordQuestionUsage } from "@/lib/firebase";
 
 const Reader = () => {
   const [passage, setPassage] = useState("");
@@ -14,15 +19,46 @@ const Reader = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [answer1, setAnswer1] = useState("");
   const [error, setError] = useState("");
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
+  
+  const { user, userProfile, isLoading, remainingQuestions, refreshUserProfile } = useAuth();
+
+  // Check if user is logged in and has access
+  const canAskQuestion = !!user && 
+    (userProfile?.isAdmin || userProfile?.plan === "premium" || remainingQuestions > 0);
 
   const handleAnalyze = async () => {
     if (!passage || !question1) return;
+    
+    // Check authentication
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    
+    // Check usage limits
+    if (!canAskQuestion) {
+      setError("You've reached your weekly question limit. Please upgrade to premium for unlimited access.");
+      return;
+    }
     
     setIsSubmitting(true);
     setError("");
     setAnswer1("");
 
     try {
+      // Record question usage
+      if (user) {
+        const allowed = await recordQuestionUsage(user.uid);
+        
+        if (!allowed) {
+          setError("You've reached your weekly question limit. Please upgrade to premium for unlimited access.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
       const response = await askGemini(passage, question1);
       
       if (response.error) {
@@ -30,10 +66,29 @@ const Reader = () => {
       } else {
         setAnswer1(response.answer);
       }
+      
+      // Refresh user profile to update remaining questions count
+      refreshUserProfile();
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleClear = () => {
+    setQuestion1("");
+    setAnswer1("");
+    setError("");
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setQuestion1(text);
+    } catch (err) {
+      toast.error("Failed to paste from clipboard");
     }
   };
 
@@ -46,6 +101,48 @@ const Reader = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Get instant answers to your Sparx homework questions with our AI-powered assistant
           </p>
+          
+          {/* User account section */}
+          <div className="flex justify-center mt-4">
+            {isLoading ? (
+              <div className="h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            ) : user ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => setIsUserSettingsOpen(true)}
+                >
+                  <span className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-xs font-medium text-blue-700">
+                      {userProfile?.displayName?.charAt(0).toUpperCase() || "U"}
+                    </span>
+                  </span>
+                  <span>{userProfile?.displayName || "User"}</span>
+                  {userProfile?.plan === "premium" && (
+                    <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                  )}
+                </Button>
+                
+                {!userProfile?.isAdmin && userProfile?.plan !== "premium" && (
+                  <div className="text-xs text-gray-500 bg-gray-100 py-1 px-2 rounded-full flex items-center">
+                    <span>{remainingQuestions} questions left</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => setIsLoginModalOpen(true)}
+              >
+                <User className="h-4 w-4" />
+                Sign In
+              </Button>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="instructions" className="w-full mt-8">
@@ -78,7 +175,7 @@ const Reader = () => {
                         <ul className="mt-2 space-y-3 text-blue-600">
                           <li className="flex items-center gap-2">
                             <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-                            Google Chrome browser
+                            Google Chrome
                           </li>
                           <li className="flex items-center gap-2">
                             <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
@@ -87,6 +184,10 @@ const Reader = () => {
                           <li className="flex items-center gap-2">
                             <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
                             Bookmarks bar enabled
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
+                            An account (free or premium)
                           </li>
                         </ul>
                       </div>
@@ -161,67 +262,145 @@ const Reader = () => {
           </TabsContent>
 
           <TabsContent value="helper" className="focus-visible:outline-none">
-            <Card className="bg-white shadow-xl border-0 rounded-xl overflow-hidden">
-              <CardContent className="p-8 space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Passage Text
-                  </label>
-                  <Textarea
-                    placeholder="Paste your passage text here..."
-                    className="min-h-[200px] text-base p-4 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200"
-                    value={passage}
-                    onChange={(e) => setPassage(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Question
-                  </label>
-                  <Textarea
-                    placeholder="Enter your question here..."
-                    className="min-h-[100px] text-base p-4 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200"
-                    value={question1}
-                    onChange={(e) => setQuestion1(e.target.value)}
-                  />
-                </div>
-
-                {error && (
-                  <Alert variant="destructive" className="text-base animate-in fade-in slide-in-from-top-1">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleAnalyze}
-                    disabled={!passage || !question1 || isSubmitting}
-                    className={`px-8 py-6 text-base font-medium rounded-lg transition-all duration-200 ease-in-out ${
-                      isSubmitting 
-                        ? 'bg-blue-400 cursor-not-allowed' 
-                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-95'
-                    }`}
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Analyzing...
-                      </div>
-                    ) : (
-                      "Get Answer"
-                    )}
-                  </Button>
-                </div>
-
-                {answer1 && (
-                  <div className="mt-6 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-lg p-6 animate-in fade-in slide-in-from-bottom-2">
-                    <h4 className="text-base font-semibold text-green-800 mb-3">Answer:</h4>
-                    <p className="text-green-700 text-lg leading-relaxed">{answer1}</p>
+            {!user ? (
+              <Card className="bg-white shadow-xl border-0 rounded-xl overflow-hidden">
+                <CardContent className="p-12 text-center">
+                  <div className="flex flex-col items-center">
+                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+                      <User className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Sign In Required</h2>
+                    <p className="text-gray-600 max-w-md mb-8">
+                      Please sign in to use the Sparx Helper. Free accounts can ask up to 8 questions per week, or upgrade to premium for unlimited access.
+                    </p>
+                    <Button 
+                      onClick={() => setIsLoginModalOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-700 px-8 py-6 text-lg"
+                    >
+                      Sign In to Continue
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white shadow-xl border-0 rounded-xl overflow-hidden">
+                <CardContent className="p-8 space-y-6">
+                  {/* Premium banner for free users */}
+                  {userProfile?.plan !== "premium" && !userProfile?.isAdmin && (
+                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-lg p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                          <Star className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-indigo-900 mb-1">Upgrade to Premium</h3>
+                          <p className="text-sm text-indigo-700">
+                            {remainingQuestions > 0 
+                              ? `You have ${remainingQuestions} questions remaining this week` 
+                              : "You've reached your weekly question limit"}
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="secondary"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        onClick={() => setIsUserSettingsOpen(true)}
+                      >
+                        Upgrade
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Main form */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Passage Text
+                    </label>
+                    <Textarea
+                      placeholder="Paste your passage text here..."
+                      className="min-h-[200px] text-base p-4 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200"
+                      value={passage}
+                      onChange={(e) => setPassage(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Question
+                    </label>
+                    <Textarea
+                      placeholder="Enter your question here..."
+                      className="min-h-[100px] text-base p-4 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow duration-200"
+                      value={question1}
+                      onChange={(e) => setQuestion1(e.target.value)}
+                    />
+                  </div>
+
+                  {error && (
+                    <Alert variant="destructive" className="text-base animate-in fade-in slide-in-from-top-1">
+                      <AlertDescription className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" />
+                        <span>{error}</span>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Usage limit warning for free users */}
+                  {userProfile?.plan !== "premium" && !userProfile?.isAdmin && remainingQuestions <= 3 && remainingQuestions > 0 && (
+                    <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800 animate-in fade-in">
+                      <AlertDescription className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                        <span>You have only {remainingQuestions} questions remaining this week. Consider upgrading to premium for unlimited access.</span>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      onClick={handlePaste}
+                      variant="outline"
+                      className="px-4 py-6 text-base font-medium rounded-lg transition-all duration-200 ease-in-out hover:bg-gray-50 border-gray-200"
+                      title="Paste from clipboard"
+                    >
+                      <ClipboardPaste className="h-5 w-5 text-gray-600" />
+                    </Button>
+                    <Button
+                      onClick={handleClear}
+                      variant="secondary"
+                      disabled={isSubmitting || (!question1 && !answer1)}
+                      className="px-8 py-6 text-base font-medium rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg active:scale-95"
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      onClick={handleAnalyze}
+                      disabled={!passage || !question1 || isSubmitting || !canAskQuestion}
+                      className={`px-8 py-6 text-base font-medium rounded-lg transition-all duration-200 ease-in-out ${
+                        isSubmitting || !canAskQuestion
+                          ? 'bg-blue-400 cursor-not-allowed' 
+                          : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-95'
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Analyzing...
+                        </div>
+                      ) : (
+                        "Get Answer"
+                      )}
+                    </Button>
+                  </div>
+
+                  {answer1 && (
+                    <div className="mt-6 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-lg p-6 animate-in fade-in slide-in-from-bottom-2">
+                      <h4 className="text-base font-semibold text-green-800 mb-3">Answer:</h4>
+                      <p className="text-green-700 text-lg leading-relaxed">{answer1}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -229,6 +408,18 @@ const Reader = () => {
           &copy; {new Date().getFullYear()} SPARX365. All rights reserved.
         </p>
       </main>
+      
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+      />
+      
+      {/* User Settings Dialog */}
+      <UserSettingsDialog 
+        isOpen={isUserSettingsOpen}
+        onClose={() => setIsUserSettingsOpen(false)}
+      />
     </div>
   );
 };

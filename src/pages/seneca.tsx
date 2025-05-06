@@ -1,16 +1,11 @@
-
 import React, { useState } from "react";
 import Header from "@/components/Header";
 import SenecaHelper from "@/components/SenecaHelper";
 import ResultsDisplay from "@/components/ResultsDisplay";
-import { SenecaResults } from "@/utils/senecaScraper";
+import { SenecaResults } from "@/utils/types";
 
-const Sparx = () => {
+const Seneca = () => {
   const [results, setResults] = useState<SenecaResults | null>(null);
-
-  const handleResults = (data: SenecaResults) => {
-    setResults(data);
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-secondary/30">
@@ -18,15 +13,17 @@ const Sparx = () => {
       <main className="flex-1 container py-8 px-4 flex flex-col">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight mb-2">
-            <span className="text-primary logo-text">SPARX</span> Homework Helper
+            <span className="text-primary logo-text">Free Seneca</span> Homework Helper
           </h1>
           <p className="text-muted-foreground max-w-lg mx-auto">
-            Enter your Seneca URL below to get the answers for your homework.
+            Get instant answers to your Seneca homework questions
           </p>
         </div>
 
-        <SenecaHelper onResultsReceived={handleResults} />
-        <ResultsDisplay results={results} />
+        <div className="space-y-6 max-w-3xl mx-auto w-full">
+          <SenecaHelper onResultsReceived={setResults} />
+          <ResultsDisplay results={results} />
+        </div>
       </main>
       
       <footer className="border-t py-6 md:py-0">
@@ -40,4 +37,4 @@ const Sparx = () => {
   );
 };
 
-export default Sparx;
+export default Seneca; 

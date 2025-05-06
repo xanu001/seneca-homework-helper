@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +49,11 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived, onLoadin
     }
   };
 
+  const handleClear = () => {
+    setUrl("");
+    onResultsReceived({ questions: [] });
+  };
+
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg border border-gray-100">
       <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-lg">
@@ -69,9 +73,20 @@ const SenecaHelper: React.FC<SenecaHelperProps> = ({ onResultsReceived, onLoadin
               className="flex-1"
               disabled={loading}
             />
-            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 ease-in-out transform hover:scale-105">
-              {loading ? "Loading..." : "Get Answers"}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 ease-in-out transform hover:scale-105">
+                {loading ? "Loading..." : "Get Answers"}
+              </Button>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={handleClear}
+                disabled={loading || !url}
+                className="transition-all duration-200 ease-in-out transform hover:scale-105"
+              >
+                Clear
+              </Button>
+            </div>
           </div>
           <div className="text-sm text-muted-foreground">
             Enter your full Seneca Learning homework URL to get instant answers.

@@ -1,73 +1,109 @@
-# Welcome to your Lovable project
+# Seneca Homework Helper
 
-## Project info
+A comprehensive tool for helping students with their Seneca and Sparx homework assignments.
 
-**URL**: https://lovable.dev/projects/80a52c8a-d6ec-4ac8-867c-78135628cf30
+## Features
 
-## How can I edit this code?
+- Seneca homework assistance
+- Sparx reader with text selection capability
+- User authentication system (Google & GitHub login)
+- Free and Premium subscription tiers
+- Admin dashboard for monitoring usage
+- Usage analytics and tracking
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- React with TypeScript
+- Vite for building
+- Tailwind CSS for styling
+- Firebase Authentication
+- Firestore for database
+- Firebase Analytics for user tracking
+- Stripe for payment processing (integration to be completed)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/80a52c8a-d6ec-4ac8-867c-78135628cf30) and start prompting.
+## Setup Instructions
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 14+ and npm/yarn
+- Firebase account
+- Stripe account (for premium subscriptions)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Development Setup
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone the repository
+   ```bash
+   git clone <repository-url>
+   cd seneca-homework-helper
+   ```
 
-Follow these steps:
+2. Install dependencies
+   ```bash
+   npm install
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Configure Firebase
+   - Create a Firebase project at [https://console.firebase.google.com/](https://console.firebase.google.com/)
+   - Enable Authentication, Firestore, and Analytics
+   - Add Google and GitHub auth providers in the Firebase console
+   - Copy your Firebase config to `src/lib/firebase.ts`
+   - Enable the admin accounts in the Firebase console
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Start the development server
+   ```bash
+   npm run dev
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Deployment
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+1. Build the application
+   ```bash
+   npm run build
+   ```
 
-**Edit a file directly in GitHub**
+2. Deploy to Firebase
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   firebase init
+   firebase deploy
+   ```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3. Configure Firestore Security Rules
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
 
-**Use GitHub Codespaces**
+## User Tiers
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Free Tier
+- 8 questions per week
+- Basic access to Sparx reader
 
-## What technologies are used for this project?
+### Premium Tier ($5.99/month)
+- Unlimited questions
+- Priority support
+- Enhanced features
+- No weekly limits
 
-This project is built with:
+### Admin Access
+- Admin accounts have unlimited access
+- Can view all user data
+- Can modify user plans
+- Current admin emails:
+  - tom.business.purposes@gmail.com
+  - thomas.barrett.22@sandon.essex.sch.uk
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Stripe Integration
 
-## How can I deploy this project?
+To complete the Stripe integration:
 
-Simply open [Lovable](https://lovable.dev/projects/80a52c8a-d6ec-4ac8-867c-78135628cf30) and click on Share -> Publish.
+1. Create a Stripe account at [https://stripe.com](https://stripe.com)
+2. Get your API keys from the Stripe dashboard
+3. Update the `.env` file with your Stripe keys
+4. Implement the Stripe checkout functionality in the `handleUpgrade` function in `UserSettingsDialog.tsx`
+5. Create webhook endpoints for handling subscription events
 
-## Can I connect a custom domain to my Lovable project?
+## License
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+[MIT](LICENSE)

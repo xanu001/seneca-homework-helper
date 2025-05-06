@@ -8,7 +8,7 @@ export interface GeminiResponse {
 
 export const askGemini = async (passage: string, question: string, choices?: string): Promise<GeminiResponse> => {
   try {
-    const prompt = `I am going to ask you some questions about this text. Please make your answers as short as possible. If the answer is not in the story please answer "Not In Story":
+    const prompt = `I am going to ask you some questions about this text. Please make your answers as short as possible. Answer only with the premade question choices supplied by the user. If the answer is not in the story please answer "Not In Story":
 
 ${passage}
 

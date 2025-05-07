@@ -40,8 +40,12 @@ const Navbar = () => {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link to="/" className="flex items-center">
-            <span className="font-bold text-xl text-indigo-600">Sparx</span>
-            <span className="logo-number text-indigo-800">365</span>
+            <div className="flex items-center">
+              <span className="bg-primary text-primary-foreground px-2 py-1 rounded-md text-sm mr-2">
+                <span className="logo-number">36S</span>
+              </span>
+              <span className="font-bold text-xl text-primary logo-text">SPARX365</span>
+            </div>
           </Link>
         </div>
 

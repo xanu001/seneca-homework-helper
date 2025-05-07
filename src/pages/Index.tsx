@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import Header from "@/components/Header";
 import SenecaHelper from "@/components/SenecaHelper";
 import ResultsDisplay from "@/components/ResultsDisplay";
+import { Card } from "@/components/ui/card";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 const Index = () => {
   const [results, setResults] = useState<any | null>(null);
@@ -20,8 +22,25 @@ const Index = () => {
           </p>
         </div>
 
-        <div className="space-y-6 max-w-3xl mx-auto w-full">
-          <SenecaHelper onResultsReceived={setResults} />
+        <div className="grid md:grid-cols-2 gap-8 mb-10">
+          <div className="space-y-6 w-full">
+            <SenecaHelper onResultsReceived={setResults} />
+          </div>
+          
+          <div className="flex flex-col justify-center items-center">
+            <Card className="w-full overflow-hidden shadow-lg animate-fade-in">
+              <AspectRatio ratio={16/9} className="bg-muted">
+                <img 
+                  src="/lovable-uploads/b0f8d749-db3d-4f57-9cc3-e42079d7c4b9.png" 
+                  alt="Seneca result example" 
+                  className="object-cover w-full h-full"
+                />
+              </AspectRatio>
+            </Card>
+          </div>
+        </div>
+
+        <div className="w-full">
           <ResultsDisplay results={results} />
         </div>
       </main>

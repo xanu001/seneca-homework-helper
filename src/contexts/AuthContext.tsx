@@ -16,7 +16,7 @@ import {
   logEvent,
   getRemainingQuestions
 } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
 
 interface AuthContextType {
@@ -39,6 +39,10 @@ interface UserProfile {
   questionsUsedThisWeek: number;
   weekStartedAt: Date | null;
   createdAt: Date | null;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripePriceId?: string;
+  stripeCurrentPeriodEnd?: Date | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,7 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isAdmin: userData.isAdmin || false,
           questionsUsedThisWeek: userData.questionsUsedThisWeek || 0,
           weekStartedAt: userData.weekStartedAt?.toDate() || null,
-          createdAt: userData.createdAt?.toDate() || null
+          createdAt: userData.createdAt?.toDate() || null,
+          stripeCustomerId: userData.stripeCustomerId,
+          stripeSubscriptionId: userData.stripeSubscriptionId,
+          stripePriceId: userData.stripePriceId,
+          stripeCurrentPeriodEnd: userData.stripeCurrentPeriodEnd?.toDate() || null
         });
 
         // Get remaining questions
@@ -161,6 +169,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => unsubscribe();
   }, []);
+
+  // Subscribe to user profile changes
+  useEffect(() => {
+    if (!user) return;
+    
+    // Set up a real-time listener for the user document
+    const userDocRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
+      if (snapshot.exists()) {
+        const userData = snapshot.data();
+        // Update user profile when data changes
+        setUserProfile({
+          uid: user.uid,
+          displayName: userData.displayName || "User",
+          email: userData.email,
+          plan: userData.plan || "free",
+          isAdmin: userData.isAdmin || false,
+          questionsUsedThisWeek: userData.questionsUsedThisWeek || 0,
+          weekStartedAt: userData.weekStartedAt?.toDate() || null,
+          createdAt: userData.createdAt?.toDate() || null,
+          stripeCustomerId: userData.stripeCustomerId,
+          stripeSubscriptionId: userData.stripeSubscriptionId,
+          stripePriceId: userData.stripePriceId,
+          stripeCurrentPeriodEnd: userData.stripeCurrentPeriodEnd?.toDate() || null
+        });
+
+        // Get remaining questions
+        const remaining = await getRemainingQuestions(user.uid);
+        setRemainingQuestions(remaining);
+        
+        // Log subscription change if plan changed
+        if (userData.plan === "premium" && userProfile?.plan === "free") {
+          toast.success("Your subscription has been activated!");
+          logEvent("subscription_activated");
+        } else if (userData.plan === "free" && userProfile?.plan === "premium") {
+          toast.info("Your subscription has ended.");
+          logEvent("subscription_ended");
+        }
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [user, userProfile?.plan]);
 
   // Auto-refresh token periodically
   useEffect(() => {

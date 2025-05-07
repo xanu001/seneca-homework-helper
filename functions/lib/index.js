@@ -1,0 +1,378 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+var _a, _b;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.webhook = exports.verifyCheckout = exports.createPortalSession = exports.createCheckoutSession = void 0;
+const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
+const stripe_1 = __importDefault(require("stripe"));
+const cors_1 = __importDefault(require("cors"));
+const corsHandler = (0, cors_1.default)({ origin: true });
+// Initialize Firebase
+admin.initializeApp();
+// Initialize Stripe with API key from config
+const stripeSecretKey = ((_a = functions.config().stripe) === null || _a === void 0 ? void 0 : _a.secret_key) || process.env.STRIPE_SECRET_KEY;
+const webhookSecret = ((_b = functions.config().stripe) === null || _b === void 0 ? void 0 : _b.webhook_secret) || process.env.STRIPE_WEBHOOK_SECRET;
+// Verify that we have a Stripe key
+if (!stripeSecretKey) {
+    console.error('Missing Stripe secret key. Set using firebase functions:config:set stripe.secret_key="your_key"');
+}
+// Initialize Stripe
+const stripe = new stripe_1.default(stripeSecretKey, {
+    apiVersion: '2023-10-16',
+});
+// Constants for plans
+const PREMIUM_PRICE_ID = 'price_1RLqGtElUl0NyuA0sSKOZOk2'; // Live mode price ID
+/**
+ * Create a Stripe Checkout Session
+ * https://docs.stripe.com/payments/accept-a-payment
+ */
+exports.createCheckoutSession = functions.https.onRequest((req, res) => {
+    // Set CORS headers for all responses
+    res.set('Access-Control-Allow-Origin', '*');
+    // Handle preflight OPTIONS request explicitly
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.set('Access-Control-Max-Age', '3600');
+        res.status(204).send('');
+        return;
+    }
+    corsHandler(req, res, async () => {
+        try {
+            if (req.method !== 'POST') {
+                res.status(405).json({ error: 'Method not allowed' });
+                return;
+            }
+            const { userId, promoCode, paymentMethod, returnUrl } = req.body;
+            if (!userId || !returnUrl) {
+                res.status(400).json({ error: 'Missing userId or returnUrl' });
+                return;
+            }
+            // Get user from Firestore
+            const userDoc = await admin.firestore().collection('users').doc(userId).get();
+            if (!userDoc.exists) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+            const userData = userDoc.data();
+            const userEmail = userData === null || userData === void 0 ? void 0 : userData.email;
+            // Set up payment method types based on request
+            const paymentMethodTypes = ['card'];
+            if (paymentMethod === 'link') {
+                paymentMethodTypes.push('link');
+            }
+            // Create checkout session
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: paymentMethodTypes,
+                line_items: [{
+                        price: PREMIUM_PRICE_ID,
+                        quantity: 1,
+                    }],
+                mode: 'subscription',
+                customer_email: userEmail,
+                client_reference_id: userId,
+                success_url: `${returnUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${returnUrl}/canceled`,
+                allow_promotion_codes: true, // Enable coupon code input
+            });
+            res.status(200).json({ sessionId: session.id });
+        }
+        catch (error) {
+            console.error('Error creating checkout session:', error);
+            res.status(500).json({ error: 'Failed to create checkout session' });
+        }
+    });
+});
+/**
+ * Create a portal session for subscription management
+ * https://docs.stripe.com/customer-management/create-customer-portal-session
+ */
+exports.createPortalSession = functions.https.onRequest((req, res) => {
+    // Handle preflight OPTIONS request explicitly
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.set('Access-Control-Max-Age', '3600');
+        res.status(204).send('');
+        return;
+    }
+    corsHandler(req, res, async () => {
+        try {
+            if (req.method !== 'POST') {
+                res.status(405).json({ error: 'Method not allowed' });
+                return;
+            }
+            const { userId } = req.body;
+            if (!userId) {
+                res.status(400).json({ error: 'Missing userId' });
+                return;
+            }
+            // Get user's Stripe customer ID from Firestore
+            const userDoc = await admin.firestore().collection('users').doc(userId).get();
+            if (!userDoc.exists) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+            const userData = userDoc.data();
+            const stripeCustomerId = userData === null || userData === void 0 ? void 0 : userData.stripeCustomerId;
+            if (!stripeCustomerId) {
+                res.status(400).json({ error: 'User does not have a Stripe customer ID' });
+                return;
+            }
+            // Create portal session
+            const session = await stripe.billingPortal.sessions.create({
+                customer: stripeCustomerId,
+                return_url: req.body.returnUrl || 'https://sparx-d2635.web.app',
+            });
+            res.status(200).json({ url: session.url });
+        }
+        catch (error) {
+            console.error('Error creating portal session:', error);
+            res.status(500).json({ error: 'Failed to create portal session' });
+        }
+    });
+});
+/**
+ * Verify a checkout session
+ * Used by the success page to confirm payment completion
+ */
+exports.verifyCheckout = functions.https.onRequest((req, res) => {
+    // Set CORS headers for all responses
+    res.set('Access-Control-Allow-Origin', '*');
+    // Handle preflight OPTIONS request explicitly
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.set('Access-Control-Max-Age', '3600');
+        res.status(204).send('');
+        return;
+    }
+    corsHandler(req, res, async () => {
+        try {
+            if (req.method !== 'POST') {
+                res.status(405).json({ error: 'Method not allowed' });
+                return;
+            }
+            const { sessionId } = req.body;
+            if (!sessionId) {
+                res.status(400).json({ error: 'Missing sessionId' });
+                return;
+            }
+            // Retrieve the session from Stripe
+            const session = await stripe.checkout.sessions.retrieve(sessionId);
+            if (!session) {
+                res.status(404).json({ error: 'Session not found' });
+                return;
+            }
+            // Check session status
+            if (session.payment_status !== 'paid') {
+                res.status(400).json({ error: 'Payment not completed' });
+                return;
+            }
+            // Get the user ID from the session
+            const userId = session.client_reference_id;
+            if (!userId) {
+                res.status(400).json({ error: 'No user associated with this session' });
+                return;
+            }
+            // If the webhook hasn't processed this yet, let's update the user ourselves
+            const userDoc = await admin.firestore().collection('users').doc(userId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                // Only update if not already premium
+                if (userData.plan !== 'premium') {
+                    await handleCheckoutSessionCompleted(session);
+                }
+            }
+            res.status(200).json({
+                success: true,
+                user_id: userId
+            });
+        }
+        catch (error) {
+            console.error('Error verifying checkout:', error);
+            res.status(500).json({ error: 'Failed to verify checkout session' });
+        }
+    });
+});
+/**
+ * Webhook handler for Stripe events
+ * https://docs.stripe.com/webhooks
+ */
+exports.webhook = functions.https.onRequest((req, res) => {
+    // Handle preflight OPTIONS request explicitly
+    // Note: Webhooks are typically called by Stripe servers and don't need CORS,
+    // but we'll add it for consistency with our other functions.
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, stripe-signature');
+        res.set('Access-Control-Max-Age', '3600');
+        res.status(204).send('');
+        return;
+    }
+    (async () => {
+        try {
+            if (req.method !== 'POST') {
+                res.status(405).send('Method Not Allowed');
+                return;
+            }
+            const signature = req.headers['stripe-signature'];
+            if (!signature || !webhookSecret) {
+                res.status(400).send('Missing signature or webhook secret');
+                return;
+            }
+            // Verify the event
+            let event;
+            try {
+                event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
+            }
+            catch (err) {
+                console.log(`Webhook signature verification failed: ${err.message}`);
+                res.status(400).send(`Webhook Error: ${err.message}`);
+                return;
+            }
+            // Handle the event
+            switch (event.type) {
+                case 'checkout.session.completed':
+                    await handleCheckoutSessionCompleted(event.data.object);
+                    break;
+                case 'customer.subscription.updated':
+                    await handleSubscriptionUpdated(event.data.object);
+                    break;
+                case 'customer.subscription.deleted':
+                    await handleSubscriptionDeleted(event.data.object);
+                    break;
+                default:
+                    console.log(`Unhandled event type ${event.type}`);
+            }
+            res.status(200).json({ received: true });
+        }
+        catch (error) {
+            console.error('Error handling webhook:', error);
+            res.status(500).send('Internal Server Error');
+        }
+    })();
+});
+/**
+ * Handle successful checkout completion
+ */
+async function handleCheckoutSessionCompleted(session) {
+    const userId = session.client_reference_id;
+    const customerId = session.customer;
+    const subscriptionId = session.subscription;
+    if (!userId) {
+        console.error('No user ID in session metadata');
+        return;
+    }
+    try {
+        // Get subscription details
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const priceId = subscription.items.data[0].price.id;
+        // Update user in Firestore
+        await admin.firestore().collection('users').doc(userId).update({
+            plan: 'premium',
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: subscriptionId,
+            stripePriceId: priceId,
+            stripeCurrentPeriodEnd: admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log(`Updated subscription for user ${userId}`);
+    }
+    catch (error) {
+        console.error(`Error updating user after checkout: ${error}`);
+    }
+}
+/**
+ * Handle subscription updates
+ */
+async function handleSubscriptionUpdated(subscription) {
+    try {
+        // Find user with this subscription ID
+        const usersSnapshot = await admin.firestore()
+            .collection('users')
+            .where('stripeSubscriptionId', '==', subscription.id)
+            .get();
+        if (usersSnapshot.empty) {
+            console.log(`No user found for subscription ${subscription.id}`);
+            return;
+        }
+        for (const doc of usersSnapshot.docs) {
+            await doc.ref.update({
+                stripeCurrentPeriodEnd: admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000),
+                stripePriceId: subscription.items.data[0].price.id,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`Updated subscription period for user ${doc.id}`);
+        }
+    }
+    catch (error) {
+        console.error(`Error updating subscription: ${error}`);
+    }
+}
+/**
+ * Handle subscription cancellation
+ */
+async function handleSubscriptionDeleted(subscription) {
+    try {
+        // Find user with this subscription ID
+        const usersSnapshot = await admin.firestore()
+            .collection('users')
+            .where('stripeSubscriptionId', '==', subscription.id)
+            .get();
+        if (usersSnapshot.empty) {
+            console.log(`No user found for subscription ${subscription.id}`);
+            return;
+        }
+        for (const doc of usersSnapshot.docs) {
+            await doc.ref.update({
+                plan: 'free',
+                stripeCurrentPeriodEnd: null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`Marked subscription as canceled for user ${doc.id}`);
+        }
+    }
+    catch (error) {
+        console.error(`Error processing subscription cancellation: ${error}`);
+    }
+}
+//# sourceMappingURL=index.js.map

@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "sparx-d2635"
+  },
+  "targets": {},
+  "etags": {
+    "sparx-d2635": {
+      "extensionInstances": {
+        "firestore-stripe-payments": "f2c4365908069ddeb66860658982f03d37625c3dbd6f30fc9f0ea974276b0108",
+        "firestore-stripe-payments-1msf": "2bee4834ae6138e4b41409ef91cc1864a84c71f1c9694ab250e7735b9706600e"
+      }
+    }
+  }
+}

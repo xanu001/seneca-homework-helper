@@ -102,8 +102,13 @@ export async function createCheckoutSession(userId: string, options: {
  */
 export async function createPortalSession(userId: string) {
   try {
+    console.log(`Creating portal session for user: ${userId}`);
+    console.log(`Sending request to: ${FUNCTIONS_BASE_URL}/createPortalSession`);
+    
     const response = await fetch(`${FUNCTIONS_BASE_URL}/createPortalSession`, {
       method: 'POST',
+      mode: 'cors',
+      credentials: 'omit', // Don't send cookies
       headers: {
         'Content-Type': 'application/json',
       },
@@ -114,16 +119,30 @@ export async function createPortalSession(userId: string) {
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create portal session');
+      console.error(`Portal session error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Error body: ${errorText}`);
+      
+      let errorMessage = 'Failed to create portal session';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        console.error('Error parsing error response:', e);
+      }
+      
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
     
     if (!data.url) {
+      console.error('No URL returned from server:', data);
       throw new Error('Invalid response from server: missing URL');
     }
     
+    console.log(`Portal session created, redirecting to Stripe Customer Portal`);
     window.location.href = data.url;
     return true;
   } catch (error) {

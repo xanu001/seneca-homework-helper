@@ -300,7 +300,7 @@ const UserSettingsDialog: React.FC<UserSettingsDialogProps> = ({ isOpen, onClose
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <p className="text-3xl font-bold">
-                        $5.99 <span className="text-sm font-normal text-muted-foreground">/ month</span>
+                        $2.59 <span className="text-sm font-normal text-muted-foreground">/ month</span>
                       </p>
                       
                       <div className="space-y-3">
@@ -360,7 +360,7 @@ const UserSettingsDialog: React.FC<UserSettingsDialogProps> = ({ isOpen, onClose
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-green-800">Amount</span>
-                        <span className="font-medium text-green-900">$5.99 USD</span>
+                        <span className="font-medium text-green-900">$2.59 USD</span>
                       </div>
                     </div>
                     

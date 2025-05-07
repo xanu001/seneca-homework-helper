@@ -30,10 +30,14 @@ export async function createCheckoutSession(userId: string, options: {
     // Store user ID for post-payment verification
     localStorage.setItem('pendingSubscriptionUserId', userId);
     
+    console.log(`Creating checkout session for user: ${userId}`);
+    console.log(`Sending request to: ${FUNCTIONS_BASE_URL}/createCheckoutSession`);
+    
     // Create checkout session via server endpoint
     const response = await fetch(`${FUNCTIONS_BASE_URL}/createCheckoutSession`, {
       method: 'POST',
       mode: 'cors',
+      credentials: 'omit', // Don't send cookies
       headers: {
         'Content-Type': 'application/json',
       },
@@ -45,8 +49,12 @@ export async function createCheckoutSession(userId: string, options: {
       }),
     });
 
+    // Handle non-OK responses
     if (!response.ok) {
+      console.error(`Checkout error: ${response.status} ${response.statusText}`);
       const errorText = await response.text();
+      console.error(`Error body: ${errorText}`);
+      
       let errorMessage = 'Failed to create checkout session';
       
       try {
@@ -59,12 +67,15 @@ export async function createCheckoutSession(userId: string, options: {
       throw new Error(errorMessage);
     }
 
+    // Parse response
     const data = await response.json();
     
     if (!data.sessionId) {
       console.error('No sessionId returned from server:', data);
       throw new Error('Invalid response from server: missing sessionId');
     }
+    
+    console.log(`Session created, redirecting to Stripe: ${data.sessionId}`);
     
     // Redirect to checkout using Stripe.js
     const stripe = await stripePromise;

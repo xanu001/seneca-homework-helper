@@ -4,10 +4,10 @@ import Stripe from 'stripe';
 import cors from 'cors';
 
 // Get CORS configuration from Firebase config
-const corsOrigin = functions.config().cors?.origin || '*';
+const corsOrigin = functions.config().cors?.origin || 'https://sparx-d2635.web.app';
 const corsHandler = cors({ 
-  origin: corsOrigin, 
-  methods: ['POST', 'OPTIONS'],
+  origin: true, // Allow requests from any origin
+  methods: ['POST', 'OPTIONS', 'GET'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
   maxAge: 3600
@@ -31,33 +31,33 @@ const stripe = new Stripe(stripeSecretKey, {
 });
 
 // Constants for plans
-const PREMIUM_PRICE_ID = 'price_1RLqGtElUl0NyuA0sSKOZOk2'; // Live mode price ID
+const PREMIUM_PRICE_ID = 'price_1RLqGtElUl0NyuA0sSKOZOk2'; // Price ID for $2.59/month
 
 /**
  * Create a Stripe Checkout Session
  * https://docs.stripe.com/payments/accept-a-payment
  */
 export const createCheckoutSession = functions.https.onRequest((req, res) => {
-  // Enable CORS using the corsHandler
-  return corsHandler(req, res, async () => {
-    // Set CORS headers for all responses to be safe
-    res.set('Access-Control-Allow-Origin', corsOrigin);
-    
-    // Handle preflight OPTIONS requests
-    if (req.method === 'OPTIONS') {
-      res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
-      res.set('Access-Control-Max-Age', '3600');
-      res.status(204).send('');
-      return;
-    }
-    
-    try {
-      if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method not allowed' });
-        return;
-      }
+  // Set CORS headers for all responses
+  res.set('Access-Control-Allow-Origin', 'https://sparx-d2635.web.app');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.set('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  
+  // Handle actual request
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
 
+  (async () => {
+    try {
       console.log('Received checkout request:', JSON.stringify(req.body));
       const { userId, promoCode, paymentMethod, returnUrl } = req.body;
       
@@ -106,7 +106,7 @@ export const createCheckoutSession = functions.https.onRequest((req, res) => {
       console.error('Error creating checkout session:', error);
       res.status(500).json({ error: 'Failed to create checkout session' });
     }
-  });
+  })();
 });
 
 /**
@@ -114,23 +114,26 @@ export const createCheckoutSession = functions.https.onRequest((req, res) => {
  * https://docs.stripe.com/customer-management/create-customer-portal-session
  */
 export const createPortalSession = functions.https.onRequest((req, res) => {
-  // Handle preflight OPTIONS request explicitly
+  // Set CORS headers for all responses
+  res.set('Access-Control-Allow-Origin', 'https://sparx-d2635.web.app');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.set('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.set('Access-Control-Max-Age', '3600');
     res.status(204).send('');
     return;
   }
+  
+  // Handle actual request
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
 
-  corsHandler(req, res, async () => {
+  (async () => {
     try {
-      if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method not allowed' });
-        return;
-      }
-
       const { userId } = req.body;
       
       if (!userId) {
@@ -164,7 +167,7 @@ export const createPortalSession = functions.https.onRequest((req, res) => {
       console.error('Error creating portal session:', error);
       res.status(500).json({ error: 'Failed to create portal session' });
     }
-  });
+  })();
 });
 
 /**
@@ -173,41 +176,50 @@ export const createPortalSession = functions.https.onRequest((req, res) => {
  */
 export const verifyCheckout = functions.https.onRequest((req, res) => {
   // Set CORS headers for all responses
-  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Origin', 'https://sparx-d2635.web.app');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.set('Access-Control-Max-Age', '3600');
   
-  // Handle preflight OPTIONS request explicitly
+  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.set('Access-Control-Max-Age', '3600');
     res.status(204).send('');
     return;
   }
+  
+  console.log("verifyCheckout request received. Method:", req.method, "Headers:", JSON.stringify(req.headers));
+  
+  // Handle actual request
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
 
-  corsHandler(req, res, async () => {
+  (async () => {
     try {
-      if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method not allowed' });
-        return;
-      }
-
+      console.log('Received verification request. Body:', JSON.stringify(req.body));
       const { sessionId } = req.body;
       
       if (!sessionId) {
+        console.error('Missing session ID in verification request');
         res.status(400).json({ error: 'Missing sessionId' });
         return;
       }
 
       // Retrieve the session from Stripe
+      console.log(`Retrieving Stripe session: ${sessionId}`);
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       
       if (!session) {
+        console.error(`Session not found: ${sessionId}`);
         res.status(404).json({ error: 'Session not found' });
         return;
       }
 
+      console.log(`Session status: ${session.payment_status}`);
       // Check session status
       if (session.payment_status !== 'paid') {
+        console.error(`Payment not completed: ${sessionId}`);
         res.status(400).json({ error: 'Payment not completed' });
         return;
       }
@@ -216,9 +228,12 @@ export const verifyCheckout = functions.https.onRequest((req, res) => {
       const userId = session.client_reference_id;
       
       if (!userId) {
+        console.error(`No user ID in session: ${sessionId}`);
         res.status(400).json({ error: 'No user associated with this session' });
         return;
       }
+
+      console.log(`Verified payment for user: ${userId}`);
 
       // If the webhook hasn't processed this yet, let's update the user ourselves
       const userDoc = await admin.firestore().collection('users').doc(userId).get();
@@ -228,7 +243,10 @@ export const verifyCheckout = functions.https.onRequest((req, res) => {
         
         // Only update if not already premium
         if (userData.plan !== 'premium') {
+          console.log(`Updating user ${userId} to premium plan`);
           await handleCheckoutSessionCompleted(session);
+        } else {
+          console.log(`User ${userId} is already premium`);
         }
       }
 
@@ -240,7 +258,7 @@ export const verifyCheckout = functions.https.onRequest((req, res) => {
       console.error('Error verifying checkout:', error);
       res.status(500).json({ error: 'Failed to verify checkout session' });
     }
-  });
+  })();
 });
 
 /**
@@ -248,25 +266,26 @@ export const verifyCheckout = functions.https.onRequest((req, res) => {
  * https://docs.stripe.com/webhooks
  */
 export const webhook = functions.https.onRequest((req, res) => {
-  // Handle preflight OPTIONS request explicitly
-  // Note: Webhooks are typically called by Stripe servers and don't need CORS,
-  // but we'll add it for consistency with our other functions.
+  // Set CORS headers for all responses
+  res.set('Access-Control-Allow-Origin', 'https://sparx-d2635.web.app');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, stripe-signature');
+  res.set('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, stripe-signature');
-    res.set('Access-Control-Max-Age', '3600');
     res.status(204).send('');
+    return;
+  }
+  
+  // Handle actual request
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
     return;
   }
 
   (async () => {
     try {
-      if (req.method !== 'POST') {
-        res.status(405).send('Method Not Allowed');
-        return;
-      }
-      
       const signature = req.headers['stripe-signature'];
       if (!signature || !webhookSecret) {
         res.status(400).send('Missing signature or webhook secret');
